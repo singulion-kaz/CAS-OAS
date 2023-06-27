@@ -1,0 +1,113 @@
+Goerli (5) network
+CA:0x69fD2b690A58DEe39CE697765CB2E3c6CDE5AB82
+-----------
+CA Owner EOA:0xc10E39d4F3Cf08eD11BbE48398a5d571d3BD9981
+-----------
+
+//SPDX-License-Identifier: UNLICENSED
+//2023-6-27
+//SINGULION Corporation
+//CEO Katsuya NISHIZAWA
+//https://www.openzeppelin.com/contracts
+//https://patentscope2.wipo.int/search/ja/detail.jsf?docId=JP366820626&_cid=JP1-LDO5GB-30888-1
+pragma solidity ^0.8.9;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+
+contract shincoin2dca is ERC721, ERC721Enumerable, ERC721Burnable, Ownable {
+    using Counters for Counters.Counter;
+Counters.Counter private _tokenIdCounter;
+constructor() ERC721("QRVP1", "QV1") {}
+function safeMint(address to) public onlyOwner {
+    uint256 tokenId = _tokenIdCounter.current();
+    _tokenIdCounter.increment();
+    _safeMint(to, tokenId);
+}
+
+function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+internal
+override(ERC721, ERC721Enumerable)
+{
+super._beforeTokenTransfer(from, to, tokenId, batchSize);
+}
+
+function supportsInterface(bytes4 interfaceId)
+public
+view
+override(ERC721, ERC721Enumerable)
+returns (bool)
+{
+return super.supportsInterface(interfaceId);
+}
+
+//BnTOTP_pat.JP2021-004788,JP2021-205792,etc
+//VP-generator (VP-auth saved service-sever.)
+uint256 _key=202304572;
+function changeKey(uint256 newKey)
+public
+onlyOwner
+returns (bool)
+{
+_key = newKey;
+return (true);
+}
+
+//<<otpMp修正ブロック番号変数>>
+uint8 otpMp = 4 ;//!初期値をゼロにしない。
+function changeOtpMp(uint8 newMp)
+public
+onlyOwner
+returns (bool)
+{
+require( newMp > 0 );//otpMp>0を要求
+otpMp = newMp;
+return (true);
+}
+
+function culcVp(uint256 tokenId)
+private
+view
+returns (uint256)
+{
+//TOTP関数用　修正ブロック番号モジュール  
+require( otpMp > 0 );//otpMp>0を要求
+uint256 bnm = block.number ;//現在blocknumber取得
+uint256 bnModMp = block.number % otpMp ;//blocknumberの剰余を出す。
+bnm = bnm - bnModMp;
+bytes32 vp32b = sha256「tokenId,_key,bnm」;
+//n桁決定
+uint256 nDigi = 6;//桁
+uint256 vpUin = uint256(vp32b) % 10**nDigi;
+//n桁VPを返す
+return vpUin;
+}
+
+function genVp(uint256 tokenId)
+public
+view
+returns (uint256)
+{
+//要求：NFT所持者が呼び出す
+require(ownerOf(tokenId)==msg.sender);
+//gen
+return culcVp(tokenId);
+}
+function authVp(uint256 tokenId , uint256 vp) 
+public 
+view 
+returns (bool)
+{
+//要求：ゼロアドレス以外が呼び出せる。
+require(msg.sender != address(0), "zero address");
+//auth
+if ( vp == culcVp(tokenId) ) { 
+return true ;
+} else {
+return false;
+}
+} 
+}
